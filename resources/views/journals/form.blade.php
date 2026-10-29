@@ -47,14 +47,18 @@
     </div>
 
     <div class="g-card mb-4">
-        <div class="g-card__header">Nilai Harian (Opsional)</div>
+        <div class="g-card__header d-flex flex-wrap justify-content-between align-items-center gap-2">
+            <span>Nilai Harian (Opsional)</span>
+            <button type="button" class="btn btn-outline-primary btn-sm" id="add-score-row">Tambah murid</button>
+        </div>
         <div class="g-card__body" id="scores-wrap">
             @php $oldScores = old('scores', $journal?->scores->map(fn($s)=>['student_id'=>$s->student_id,'type'=>$s->type,'score'=>$s->score])->values()->all() ?? [['student_id'=>'','type'=>'Tugas','score'=>'']]); @endphp
             @foreach($oldScores as $idx => $row)
-            <div class="row g-2 mb-2 score-row">
+            <div class="row g-2 mb-2 score-row align-items-center">
                 <div class="col-md-5"><select name="scores[{{ $idx }}][student_id]" class="form-select form-select-sm"><option value="">— Pilih siswa —</option>@foreach($students as $student)<option value="{{ $student->id }}" @selected((string)$row['student_id'] === (string)$student->id)>{{ $student->name }}</option>@endforeach</select></div>
                 <div class="col-md-3"><input type="text" name="scores[{{ $idx }}][type]" class="form-control form-control-sm" value="{{ $row['type'] ?? 'Tugas' }}" placeholder="Jenis"></div>
                 <div class="col-md-3"><input type="number" step="0.01" min="0" max="100" name="scores[{{ $idx }}][score]" class="form-control form-control-sm" value="{{ $row['score'] ?? '' }}" placeholder="0-100"></div>
+                <div class="col-md-1 text-end"><button type="button" class="btn btn-outline-danger btn-sm remove-score-row" title="Hapus baris">&times;</button></div>
             </div>
             @endforeach
         </div>
@@ -77,5 +81,49 @@ function updateSummary() {
 }
 document.querySelectorAll('.attendance-select').forEach(el => el.addEventListener('change', updateSummary));
 updateSummary();
+
+const scoresWrap = document.getElementById('scores-wrap');
+const addScoreBtn = document.getElementById('add-score-row');
+const students = @json($students->map(fn ($s) => ['id' => $s->id, 'name' => $s->name])->values());
+const studentOptions = students.map((s) => `<option value="${s.id}">${s.name}</option>`).join('');
+
+function reindexScoreRows() {
+    scoresWrap.querySelectorAll('.score-row').forEach((row, idx) => {
+        row.querySelectorAll('[name]').forEach((el) => {
+            el.name = el.name.replace(/scores\[\d+\]/, `scores[${idx}]`);
+        });
+    });
+}
+
+function addScoreRow() {
+    const row = document.createElement('div');
+    row.className = 'row g-2 mb-2 score-row align-items-center';
+    row.innerHTML = `
+        <div class="col-md-5"><select name="scores[0][student_id]" class="form-select form-select-sm"><option value="">— Pilih siswa —</option>${studentOptions}</select></div>
+        <div class="col-md-3"><input type="text" name="scores[0][type]" class="form-control form-control-sm" value="Tugas" placeholder="Jenis"></div>
+        <div class="col-md-3"><input type="number" step="0.01" min="0" max="100" name="scores[0][score]" class="form-control form-control-sm" placeholder="0-100"></div>
+        <div class="col-md-1 text-end"><button type="button" class="btn btn-outline-danger btn-sm remove-score-row" title="Hapus baris">&times;</button></div>
+    `;
+    scoresWrap.appendChild(row);
+    reindexScoreRows();
+}
+
+addScoreBtn?.addEventListener('click', addScoreRow);
+scoresWrap?.addEventListener('click', (e) => {
+    const btn = e.target.closest('.remove-score-row');
+    if (!btn) return;
+    const rows = scoresWrap.querySelectorAll('.score-row');
+    if (rows.length <= 1) {
+        const row = rows[0];
+        row.querySelectorAll('select, input[type="text"], input[type="number"]').forEach((el) => {
+            if (el.tagName === 'SELECT') el.selectedIndex = 0;
+            else if (el.name.includes('[type]')) el.value = 'Tugas';
+            else el.value = '';
+        });
+        return;
+    }
+    btn.closest('.score-row').remove();
+    reindexScoreRows();
+});
 </script>
 @endpush
